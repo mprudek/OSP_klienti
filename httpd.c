@@ -48,50 +48,55 @@ void unimplemented(int);
  * return.  Process the request appropriately.
  * Parameters: the socket connected to the client */
 /**********************************************************************/
-void accept_request(int client)
-{
- char buf[1024];
- int numchars;
- char method[255];
- char url[255];
- char path[512];
- size_t i, j;
- struct stat st;
- int cgi = 0;      /* becomes true if server decides this is a CGI
+void accept_request(int client){
+ 	char buf[1024];
+ 	int numchars;
+ 	char method[255];
+ 	char url[255];
+ 	char path[512];
+ 	size_t i, j;
+ 	struct stat st;
+ 	int cgi = 0;      /* becomes true if server decides this is a CGI
                     * program */
- char *query_string = NULL;
+ 	char *query_string = NULL;
 
- numchars = get_line(client, buf, sizeof(buf));
- i = 0; j = 0;
- while (!ISspace(buf[j]) && (i < sizeof(method) - 1))
- {
-  method[i] = buf[j];
-  i++; j++;
- }
- method[i] = '\0';
+ 	numchars = get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
+	printf("buff=%s\n",buf);
+ 	i = 0; 
+	j = 0;
+ 	while (!ISspace(buf[j]) && (i < sizeof(method) - 1)){
+  		method[i] = buf[j];
+  		i++;
+		j++;
+ 	}
+ 	method[i] = '\0';
 
- if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
- {
-  unimplemented(client);
-  return;
- }
+ 	if (strcasecmp(method, "GET") && strcasecmp(method, "POST")){
+  		unimplemented(client);
+  		return;
+ 	}
 
  	if (strcasecmp(method, "POST") == 0){
 		printf("post method\n");
-  		cgi = 1;
 	}
 
- i = 0;
- while (ISspace(buf[j]) && (j < sizeof(buf)))
-  j++;
- while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf)))
- {
-  url[i] = buf[j];
-  i++; j++;
- }
- url[i] = '\0';
+ 	/* preskocime mezery */
+ 	while (ISspace(buf[j]) && (j < sizeof(buf))){
+  		j++;
+	}
 
- 	if (strcasecmp(method, "GET") == 0){
+	/* URL pozadavku - resource */
+	i = 0; 	
+	while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf))){
+  		url[i] = buf[j];
+  		i++;
+		j++;
+ 	}
+ 	url[i] = '\0';
+	printf("url=%s\n",url);
+
+ 	
+	if (strcasecmp(method, "GET") == 0){
 		printf("get method\n");
   		query_string = url;
   		while ((*query_string != '?') && (*query_string != '\0')){
@@ -104,29 +109,34 @@ void accept_request(int client)
   		}
  	}
 
- sprintf(path, "htdocs%s", url);
- if (path[strlen(path) - 1] == '/')
-  strcat(path, "index.html");
- if (stat(path, &st) == -1) {
-  while ((numchars > 0) && strcmp("\n", buf))  /* read & discard headers */
-   numchars = get_line(client, buf, sizeof(buf));
-  not_found(client);
- }
- else
- {
-  if ((st.st_mode & S_IFMT) == S_IFDIR)
-   strcat(path, "/index.html");
-  if ((st.st_mode & S_IXUSR) ||
-      (st.st_mode & S_IXGRP) ||
-      (st.st_mode & S_IXOTH)    )
-   cgi = 1;
-  if (!cgi)
-   serve_file(client, path);
-  else
-   execute_cgi(client, path, method, query_string);
- }
+ 	sprintf(path, "htdocs%s", url);
+ 	if (path[strlen(path) - 1] == '/'){
+  		strcat(path, "index.html");
+	}  
+	if (stat(path, &st) == -1) {
+    		while ((numchars > 0) && strcmp("\n", buf)) { /* read & discard headers */
+      			numchars = get_line(client, buf, sizeof(buf));
+    		}
+    		not_found(client);
+      		printf("file not found1\n");
 
- close(client);
+ 	}else{
+  		if ((st.st_mode & S_IFMT) == S_IFDIR){
+   			strcat(path, "/index.html");
+		}
+  		if ((st.st_mode & S_IXUSR) ||
+      			(st.st_mode & S_IXGRP) ||
+      			(st.st_mode & S_IXOTH)    ){
+   			
+			cgi = 1;
+  			if (!cgi){
+   				serve_file(client, path);
+  			}else{
+   				execute_cgi(client, path, method, query_string);
+			}
+ 		}
+	}
+ 	close(client);
 }
 
 /**********************************************************************/
@@ -401,8 +411,10 @@ void serve_file(int client, const char *filename)
   numchars = get_line(client, buf, sizeof(buf));
 
  resource = fopen(filename, "r");
- if (resource == NULL)
-  not_found(client);
+ if (resource == NULL){
+    not_found(client);
+    printf("file not found2\n");
+ }
  else
  {
   headers(client, filename);
@@ -474,31 +486,25 @@ void unimplemented(int client)
 
 /**********************************************************************/
 
-int main(void)
-{
- int server_sock = -1;
- u_short port = 0;
- int client_sock = -1;
- struct sockaddr_in client_name;
- int client_name_len = sizeof(client_name);
- //pthread_t newthread;
+int main(void){
+ 	int server_sock = -1;
+ 	u_short port = 0;
+ 	int client_sock = -1;
+ 	struct sockaddr_in client_name;
+ 	int client_name_len = sizeof(client_name);
 
- server_sock = startup(&port);
- printf("httpd running on port %d\n", port);
+ 	server_sock = startup(&port);
+ 	printf("httpd running on port %d\n", port);
 
- while (1)
- {
-  client_sock = accept(server_sock,
+ 	while (1){
+  		client_sock = accept(server_sock,
                        (struct sockaddr *)&client_name,
                        &client_name_len);
-  if (client_sock == -1)
-   error_die("accept");
-  accept_request(client_sock); 
- //if (pthread_create(&newthread , NULL, accept_request, client_sock) != 0)
-   //perror("pthread_create");
- }
-
- close(server_sock);
-
- return(0);
+  		if (client_sock == -1){
+   			error_die("accept");
+		}
+  		accept_request(client_sock); 
+ 	}
+ 	close(server_sock);
+	return(0);
 }
