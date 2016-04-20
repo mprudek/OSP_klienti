@@ -76,8 +76,10 @@ void accept_request(int client)
   return;
  }
 
- if (strcasecmp(method, "POST") == 0)
-  cgi = 1;
+ 	if (strcasecmp(method, "POST") == 0){
+		printf("post method\n");
+  		cgi = 1;
+	}
 
  i = 0;
  while (ISspace(buf[j]) && (j < sizeof(buf)))
@@ -89,18 +91,18 @@ void accept_request(int client)
  }
  url[i] = '\0';
 
- if (strcasecmp(method, "GET") == 0)
- {
-  query_string = url;
-  while ((*query_string != '?') && (*query_string != '\0'))
-   query_string++;
-  if (*query_string == '?')
-  {
-   cgi = 1;
-   *query_string = '\0';
-   query_string++;
-  }
- }
+ 	if (strcasecmp(method, "GET") == 0){
+		printf("get method\n");
+  		query_string = url;
+  		while ((*query_string != '?') && (*query_string != '\0')){
+   			query_string++;
+		}
+  		if (*query_string == '?'){
+   			cgi = 1;
+   			*query_string = '\0';
+  	 		query_string++;
+  		}
+ 	}
 
  sprintf(path, "htdocs%s", url);
  if (path[strlen(path) - 1] == '/')
