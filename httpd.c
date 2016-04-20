@@ -42,6 +42,7 @@ void not_found(int);
 void serve_file(int, const char *);
 int startup(u_short *);
 void unimplemented(int);
+void sent_count(int client);
 
 /**********************************************************************/
 /* A request has caused a call to accept() on the server port to
@@ -98,44 +99,12 @@ void accept_request(int client){
  	
 	if (strcasecmp(method, "GET") == 0){
 		printf("get method\n");
-  		query_string = url;
-  		while ((*query_string != '?') && (*query_string != '\0')){
-   			query_string++;
+		if (!strcmp(url,"/osp/myserver/count")){
+			printf("chci pocet");
+			sent_count(client);
 		}
-  		if (*query_string == '?'){
-   			cgi = 1;
-   			*query_string = '\0';
-  	 		query_string++;
-  		}
  	}
 
- 	sprintf(path, "htdocs%s", url);
- 	if (path[strlen(path) - 1] == '/'){
-  		strcat(path, "index.html");
-	}  
-	if (stat(path, &st) == -1) {
-    		while ((numchars > 0) && strcmp("\n", buf)) { /* read & discard headers */
-      			numchars = get_line(client, buf, sizeof(buf));
-    		}
-    		not_found(client);
-      		printf("file not found1\n");
-
- 	}else{
-  		if ((st.st_mode & S_IFMT) == S_IFDIR){
-   			strcat(path, "/index.html");
-		}
-  		if ((st.st_mode & S_IXUSR) ||
-      			(st.st_mode & S_IXGRP) ||
-      			(st.st_mode & S_IXOTH)    ){
-   			
-			cgi = 1;
-  			if (!cgi){
-   				serve_file(client, path);
-  			}else{
-   				execute_cgi(client, path, method, query_string);
-			}
- 		}
-	}
  	close(client);
 }
 
@@ -391,6 +360,25 @@ void not_found(int client)
  send(client, buf, strlen(buf), 0);
  sprintf(buf, "</BODY></HTML>\r\n");
  send(client, buf, strlen(buf), 0);
+}
+
+/**********************************************************************/
+/* Testovaci metoda - vraci pouze cislo */
+/**********************************************************************/
+void sent_count(int client){
+ 	char buf[1024];
+
+	sprintf(buf, "HTTP/1.0 200 OK\r\n");
+ 	send(client, buf, strlen(buf), 0);
+ 	sprintf(buf, SERVER_STRING);
+ 	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Content-Type: text/html\r\n");
+ 	send(client, buf, strlen(buf), 0);
+ 	sprintf(buf, "\r\n");
+ 	send(client, buf, strlen(buf), 0);
+
+ 	sprintf(buf, "4\r\n");
+	send(client, buf, strlen(buf), 0);
 }
 
 /**********************************************************************/
