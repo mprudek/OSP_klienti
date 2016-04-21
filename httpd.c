@@ -52,7 +52,10 @@ void accept_request(int client){
  	char buf[1024];
  	char method[255];
  	char url[255];
+	char path[512];
+	int numchars;
  	size_t i, j;
+	struct stat st;
 
  	get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 	printf("buff=%s\n",buf);
@@ -97,6 +100,13 @@ void accept_request(int client){
 			sent_count(client);
 		}
  	}
+
+	        if (stat(path, &st) == -1) {
+                while ((numchars > 0) && strcmp("\n", buf)) { /* read & discard headers */
+                        numchars = get_line(client, buf, sizeof(buf));
+                }
+                //not_found(client);
+        }
 
  	close(client);
 }
