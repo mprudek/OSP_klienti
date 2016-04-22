@@ -50,17 +50,22 @@ void sent_count(int client);
 /**********************************************************************/
 void accept_request(int client){
  	char buf[1024];
+	char buf2[1024];
  	char method[255];
  	char url[255];
 	char path[512];
 	int numchars;
- 	size_t i, j;
+ 	size_t i, j, k;
 	struct stat st;
+	char c;
+	int length=0;	
 
- 	get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
+ 	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 	printf("buff=%s\n",buf);
- 	i = 0; 
-	j = 0;
+
+	i=0;	
+	j=0;
+
  	while (!ISspace(buf[j]) && (i < sizeof(method) - 1)){
   		method[i] = buf[j];
   		i++;
@@ -75,6 +80,28 @@ void accept_request(int client){
 
  	if (strcasecmp(method, "POST") == 0){
 		printf("post method\n");
+		for (k=0;k<6;k++){
+			get_line(client, buf2, sizeof(buf2));
+			printf("lajna%d=%s\n",k,buf2);
+			if (k==3){
+				k=16;
+				while (buf2[k]!='\n' && buf2[k]!='\r' && buf2[k]!='\0' ){
+					printf("x=%c\n",buf2[k]);
+					length*=10;
+					length+=buf2[k]-48;
+					k++;
+				}	
+				printf("length=%d",length);
+			}
+		}
+		for (k=0;k<length;k++){
+			recv(client, &c, 1, 0);
+                	printf("%c",c);
+		}
+		close(client);
+		printf("zavreno\n");
+		return;
+
 	}
 
  	/* preskocime mezery */
