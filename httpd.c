@@ -25,6 +25,10 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <zlib.h>
+#include "hashset.h"
+
+//#define TABLE 32768
+#define TABLE 7
 
 #define ISspace(x) isspace((int)(x))
 
@@ -42,10 +46,12 @@ void not_found(int);
 void serve_file(int, const char *);
 int startup(u_short *);
 void unimplemented(int);
-void sent_count(int client);
+void sent_count(int client, int count);
 void sent_OK(int client);
 int inf(const void *src, int srcLen, void *dst, int dstLen) ;
 void parse_words(char * buf);
+
+hashset_t set;
 
 /**********************************************************************/
 /* A request has caused a call to accept() on the server port to
@@ -63,7 +69,6 @@ void accept_request(int client){
  	size_t i, j;
 	unsigned char k,l;
 	struct stat st;
-	char c;
 	int length=0;	
 
  	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
@@ -134,10 +139,13 @@ void accept_request(int client){
 	}
 
 	if (strcasecmp(method, "GET") == 0){
-		printf("get method\n");
 		if (!strcmp(url,"/osp/myserver/count")){
-			printf("chci pocet");
-			sent_count(client);
+			sent_count(client,hashset_num_items(set));
+			hashset_destroy(set);
+			set = hashset_create(TABLE);
+			if (set == NULL) {
+				printf("failed to create hashset instance\n");
+			}
 		}
  	}
 
@@ -232,7 +240,7 @@ int get_line(int sock, char *buf, int size)
 /**********************************************************************/
 /* Testovaci metoda - vraci pouze cislo */
 /**********************************************************************/
-void sent_count(int client){
+void sent_count(int client, int count){
  	char buf[1024];
 
 	sprintf(buf, "HTTP/1.0 200 OK\r\n");
@@ -244,7 +252,7 @@ void sent_count(int client){
  	sprintf(buf, "\r\n");
  	send(client, buf, strlen(buf), 0);
 
- 	sprintf(buf, "4\r\n");
+ 	sprintf(buf, "%d\r\n",count);
 	send(client, buf, strlen(buf), 0);
 }
 
@@ -339,6 +347,13 @@ int main(void){
  	server_sock = startup(&port);
  	printf("httpd running on port %d\n", port);
 
+	set = hashset_create(TABLE);
+	if (set == NULL) {
+		printf("failed to create hashset instance\n");
+             	close(server_sock);
+		return 1;
+        }
+	
  	while (1){
   		client_sock = accept(server_sock,
                        (struct sockaddr *)&client_name,
@@ -399,8 +414,8 @@ void parse_words(char * buf){
 		if (buf[main_index]==' '){
 			if (word_index){ /*delka slova neni nula*/
 				word[word_index]='\0';
+				hashset_add(set, (void *)word, word_index);
 				word_index=0;
-				printf("%s\n",word); /* vypisem vyparsovane slovo*/
 			}
 		}else{
 			word[word_index]=buf[main_index];
@@ -410,6 +425,6 @@ void parse_words(char * buf){
 	}
 	if (word_index){ /*delka slova neni nula*/
 		word[word_index]='\0';
-		printf("%s\n",word); /* vypisem vyparsovane slovo*/
+		hashset_add(set, (void *)word, word_index);
 	}
 }
