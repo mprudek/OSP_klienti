@@ -85,19 +85,25 @@ void accept_request(int client){
 
  	if (strcasecmp(method, "POST") == 0){
 		printf("post method\n");
-		for (k=0;k<6;k++){
+		k=0;
+		while(1){
 			get_line(client, buf2, sizeof(buf2));
-			printf("lajna%d=%s\n",k,buf2);
+			/*newlajna pred prilohou*/
+			if (buf2[0]=='\n'){
+				printf("lajna %d brejkuju\n",k);
+				break;
+			}
+			printf("lajna %d = %s\n",k,buf2);
+			/* delka prilohy je ve 4. lajne hlavicky*/
 			if (k==3){
-				l=16;
+				l=16; /*delka prilohy je na 16 pozici*/
 				while (buf2[l]!='\n' && buf2[l]!='\r' && buf2[l]!='\0' ){
-					printf("x=%c\n",buf2[l]);
 					length*=10;
 					length+=buf2[l]-48;
 					l++;
 				}	
-				printf("length=%d",length);
 			}
+			k++;
 		}
 		recv(client,buf2,length,0);
 		length=inf(buf2,length,decomp,1024);
