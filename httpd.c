@@ -42,6 +42,7 @@ void serve_file(int, const char *);
 int startup(u_short *);
 void unimplemented(int);
 void sent_count(int client);
+void sent_OK(int client);
 
 /**********************************************************************/
 /* A request has caused a call to accept() on the server port to
@@ -55,7 +56,8 @@ void accept_request(int client){
  	char url[255];
 	char path[512];
 	int numchars;
- 	size_t i, j, k;
+ 	size_t i, j;
+	unsigned char k,l;
 	struct stat st;
 	char c;
 	int length=0;	
@@ -84,22 +86,23 @@ void accept_request(int client){
 			get_line(client, buf2, sizeof(buf2));
 			printf("lajna%d=%s\n",k,buf2);
 			if (k==3){
-				k=16;
-				while (buf2[k]!='\n' && buf2[k]!='\r' && buf2[k]!='\0' ){
-					printf("x=%c\n",buf2[k]);
+				l=16;
+				while (buf2[l]!='\n' && buf2[l]!='\r' && buf2[l]!='\0' ){
+					printf("x=%c\n",buf2[l]);
 					length*=10;
-					length+=buf2[k]-48;
-					k++;
+					length+=buf2[l]-48;
+					l++;
 				}	
 				printf("length=%d",length);
 			}
 		}
+		recv(client,buf2,length,0);
 		for (k=0;k<length;k++){
-			recv(client, &c, 1, 0);
-                	printf("%c",c);
+                	printf("%c",buf2[k]);
 		}
+		sent_OK(client); /*pokud tohle neodeslu pred zavrenim, klient
+				si zahlasi :empty response: */
 		close(client);
-		printf("zavreno\n");
 		return;
 
 	}
@@ -233,6 +236,22 @@ void sent_count(int client){
 
  	sprintf(buf, "4\r\n");
 	send(client, buf, strlen(buf), 0);
+}
+
+/**********************************************************************/
+/* Odpoved klientovi - vse je OK */
+/**********************************************************************/
+void sent_OK(int client){
+ 	char buf[1024];
+
+	sprintf(buf, "HTTP/1.0 200 OK\r\n");
+ 	send(client, buf, strlen(buf), 0);
+ 	sprintf(buf, SERVER_STRING);
+ 	send(client, buf, strlen(buf), 0);
+	sprintf(buf, "Content-Type: text/html\r\n");
+ 	send(client, buf, strlen(buf), 0);
+ 	sprintf(buf, "\r\n");
+ 	send(client, buf, strlen(buf), 0);
 }
 
 
