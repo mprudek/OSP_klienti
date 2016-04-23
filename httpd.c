@@ -140,8 +140,11 @@ void accept_request(int client){
 		decomp = calloc(len,sizeof(char));
 		len2=len;
 		while(1){
-			comp_res=uncompress(decomp,&len2,data_buf,length);
-			if (comp_res==Z_OK) break;
+			comp_res=inf(data_buf, length, decomp, len2);
+			if (comp_res>0){
+				len2=comp_res;
+				break;
+			}
 			if (comp_res==Z_MEM_ERROR){
 				free(decomp);
 				len=2*len;
@@ -150,14 +153,25 @@ void accept_request(int client){
 				printf("malo pameti, zvetsuji buffer\n");
 				continue;
 			}
-			if (comp_res==Z_MEM_ERROR){
+			if (comp_res==Z_DATA_ERROR){
 				printf("corrupted data\n");
+				break;
+			}
+			if (comp_res==Z_BUF_ERROR){
+				printf("buffer error\n");
 				exit(1);
 			}
+			printf("neco jineho\n");
+			break;
 		}
+		
+		
+		
+		
+		
 		printf("skuecna delka decompressed=%d\n",len2);
 		decomp[len2-1]='\0'; /*na konci dat je newline */
-		//printf("decomp=%s\n",decomp);
+		printf("decomp=%s\n",decomp);
 		parse_words(decomp);
 		free(data_buf);
 		free(decomp);
