@@ -135,8 +135,10 @@ void accept_request(int client){
 		recv(client,data_buf,length,0);
 		len=*((int *)&(data_buf[length-4]));
 		printf("delka decompressed=%d\n",len);
+		if (len==0) len=10*length;
 		decomp = calloc(len,sizeof(char));
 		length=inf(data_buf,length,decomp,len);
+		printf("skuecna delka decompressed=%d\n",length);
 		decomp[length-1]='\0'; /*na konci dat je newline */
 		printf("decomp=%s\n",decomp);
 		parse_words(decomp);
