@@ -134,7 +134,8 @@ void accept_request(int client){
 		printf("delka compressed=%d\n",length);
 		data_buf = calloc(length,sizeof(char));
 		recv(client,data_buf,length,0);
-		len=*((int *)&(data_buf[length-4]));
+		//len=*((int *)&(data_buf[length-4]));
+		len=0;
 		printf("delka decompressed=%d\n",len);
 		if (len==0) len=2*length;
 		decomp = calloc(len,sizeof(char));
