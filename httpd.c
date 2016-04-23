@@ -45,6 +45,7 @@ void unimplemented(int);
 void sent_count(int client);
 void sent_OK(int client);
 int inf(const void *src, int srcLen, void *dst, int dstLen) ;
+void parse_words(char * buf);
 
 /**********************************************************************/
 /* A request has caused a call to accept() on the server port to
@@ -66,7 +67,6 @@ void accept_request(int client){
 	int length=0;	
 
  	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
-	printf("buff=%s\n",buf);
 
 	i=0;	
 	j=0;
@@ -84,20 +84,18 @@ void accept_request(int client){
  	}
 
  	if (strcasecmp(method, "POST") == 0){
-		printf("post method\n");
 		k=0;
 		while(1){
 			get_line(client, buf2, sizeof(buf2));
 			/*newlajna pred prilohou*/
 			if (buf2[0]=='\n'){
-				printf("lajna %d brejkuju\n",k);
 				break;
 			}
-			printf("lajna %d = %s\n",k,buf2);
 			/* delka prilohy je ve 4. lajne hlavicky*/
 			if (k==3){
 				l=16; /*delka prilohy je na 16 pozici*/
-				while (buf2[l]!='\n' && buf2[l]!='\r' && buf2[l]!='\0' ){
+				while (buf2[l]!='\n' && buf2[l]!='\r' 
+						&& buf2[l]!='\0' ){
 					length*=10;
 					length+=buf2[l]-48;
 					l++;
@@ -107,9 +105,8 @@ void accept_request(int client){
 		}
 		recv(client,buf2,length,0);
 		length=inf(buf2,length,decomp,1024);
-		for (k=0;k<length;k++){
-			printf("%c",decomp[k]);
-		}
+		decomp[length-1]='\0'; /*na konci dat je newline */
+		parse_words(decomp);
 		sent_OK(client); /*pokud tohle neodeslu pred zavrenim, klient
 				si zahlasi :empty response: */
 		close(client);
@@ -386,4 +383,30 @@ int inf(const void *src, int srcLen, void *dst, int dstLen) {
 
     inflateEnd(&strm);
     return ret;
+}
+/**********************************************************************/
+/* Dekomprimuje obsah bufferu a ulozi ho do dalsihoi bufferu*/
+/**********************************************************************/
+void parse_words(char * buf){
+	int main_index=0; /*iterace pres bajty v bufferu*/
+	int word_index=0; /* itrace pres bajty v aktualnim sloce */
+	char word[126];
+
+	while(buf[main_index]!='\0'){
+		if (buf[main_index]==' '){
+			if (word_index){ /*delka slova neni nula*/
+				word[word_index]='\0';
+				word_index=0;
+				printf("%s\n",word); /* vypisem vyparsovane slovo*/
+			}
+		}else{
+			word[word_index]=buf[main_index];
+			word_index++;
+		}
+		main_index++;
+	}
+	if (word_index){ /*delka slova neni nula*/
+		word[word_index]='\0';
+		printf("%s\n",word); /* vypisem vyparsovane slovo*/
+	}
 }
