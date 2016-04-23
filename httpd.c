@@ -82,8 +82,27 @@ void accept_request(int client){
   		unimplemented(client);
   		return;
  	}
+ 	
+	/* preskocime mezery */
+	while (ISspace(buf[j]) && (j < sizeof(buf))){
+		j++;
+	}
 
- 	if (strcasecmp(method, "POST") == 0){
+	/* URL pozadavku - resource */
+	i = 0; 	
+	while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf))){
+		url[i] = buf[j];
+		i++;
+		j++;
+	}
+	url[i] = '\0';
+
+	if (strcasecmp(method, "POST") == 0){
+		/* chybny resource*/
+		if (strcmp(url,"/osp/myserver/data")){
+			close(client);
+			return;
+		}
 		k=0;
 		while(1){
 			get_line(client, buf2, sizeof(buf2));
@@ -114,22 +133,6 @@ void accept_request(int client){
 
 	}
 
- 	/* preskocime mezery */
- 	while (ISspace(buf[j]) && (j < sizeof(buf))){
-  		j++;
-	}
-
-	/* URL pozadavku - resource */
-	i = 0; 	
-	while (!ISspace(buf[j]) && (i < sizeof(url) - 1) && (j < sizeof(buf))){
-  		url[i] = buf[j];
-  		i++;
-		j++;
- 	}
- 	url[i] = '\0';
-	printf("url=%s\n",url);
-
- 	
 	if (strcasecmp(method, "GET") == 0){
 		printf("get method\n");
 		if (!strcmp(url,"/osp/myserver/count")){
