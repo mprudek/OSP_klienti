@@ -155,8 +155,8 @@ void accept_request(int client){
 				exit(1);
 			}
 		}
-		printf("skuecna delka decompressed=%d\n",length);
-		decomp[length-1]='\0'; /*na konci dat je newline */
+		printf("skuecna delka decompressed=%d\n",len2);
+		decomp[len2-1]='\0'; /*na konci dat je newline */
 		//printf("decomp=%s\n",decomp);
 		parse_words(decomp);
 		free(data_buf);
