@@ -61,7 +61,7 @@ hashset_t set;
 void accept_request(int client){
  	char buf[1024];
 	char buf2[1024];
-	char decomp[1024];
+	char  * decomp;
  	char method[255];
  	char url[255];
 	char path[512];
@@ -70,6 +70,8 @@ void accept_request(int client){
 	unsigned char k,l;
 	struct stat st;
 	int length=0;	
+	char * data_buf;
+	int len;
 
  	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 	printf("head=%s\n",buf);
@@ -128,11 +130,18 @@ void accept_request(int client){
 			}
 			k++;
 		}
-		recv(client,buf2,length,0);
-		length=inf(buf2,length,decomp,1024);
+		printf("delka compressed=%d\n",length);
+		data_buf = calloc(length,sizeof(char));
+		recv(client,data_buf,length,0);
+		len=*((int *)&(data_buf[length-4]));
+		printf("delka decompressed=%d\n",len);
+		decomp = calloc(len,sizeof(char));
+		length=inf(data_buf,length,decomp,len);
 		decomp[length-1]='\0'; /*na konci dat je newline */
 		printf("decomp=%s\n",decomp);
 		parse_words(decomp);
+		free(data_buf);
+		free(decomp);
 		sent_OK(client); /*pokud tohle neodeslu pred zavrenim, klient
 				si zahlasi :empty response: */
 		close(client);
