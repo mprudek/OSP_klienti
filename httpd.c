@@ -72,6 +72,7 @@ void accept_request(int client){
 	int length=0;	
 
  	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
+	printf("head=%s\n",buf);
 
 	i=0;	
 	j=0;
@@ -130,6 +131,7 @@ void accept_request(int client){
 		recv(client,buf2,length,0);
 		length=inf(buf2,length,decomp,1024);
 		decomp[length-1]='\0'; /*na konci dat je newline */
+		printf("decomp=%s\n",decomp);
 		parse_words(decomp);
 		sent_OK(client); /*pokud tohle neodeslu pred zavrenim, klient
 				si zahlasi :empty response: */
@@ -140,6 +142,7 @@ void accept_request(int client){
 
 	if (strcasecmp(method, "GET") == 0){
 		if (!strcmp(url,"/osp/myserver/count")){
+			printf("slova=%d\n",hashset_num_items(set));
 			sent_count(client,hashset_num_items(set));
 			hashset_destroy(set);
 			set = hashset_create(TABLE);
