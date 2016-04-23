@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <zlib.h>
 
 #define ISspace(x) isspace((int)(x))
 
@@ -43,6 +44,7 @@ int startup(u_short *);
 void unimplemented(int);
 void sent_count(int client);
 void sent_OK(int client);
+int inf(const void *src, int srcLen, void *dst, int dstLen) ;
 
 /**********************************************************************/
 /* A request has caused a call to accept() on the server port to
@@ -52,6 +54,7 @@ void sent_OK(int client);
 void accept_request(int client){
  	char buf[1024];
 	char buf2[1024];
+	char decomp[1024];
  	char method[255];
  	char url[255];
 	char path[512];
@@ -97,8 +100,9 @@ void accept_request(int client){
 			}
 		}
 		recv(client,buf2,length,0);
+		length=inf(buf2,length,decomp,1024);
 		for (k=0;k<length;k++){
-                	printf("%c",buf2[k]);
+			printf("%c",decomp[k]);
 		}
 		sent_OK(client); /*pokud tohle neodeslu pred zavrenim, klient
 				si zahlasi :empty response: */
@@ -340,4 +344,40 @@ int main(void){
  	}
  	close(server_sock);
 	return(0);
+}
+/**********************************************************************/
+/* Dekomprimuje obsah bufferu a ulozi ho do dalsihoi bufferu*/
+/**********************************************************************/
+int inf(const void *src, int srcLen, void *dst, int dstLen) {
+    z_stream strm  = {0};
+    strm.total_in  = strm.avail_in  = srcLen;
+    strm.total_out = strm.avail_out = dstLen;
+    strm.next_in   = (Bytef *) src;
+    strm.next_out  = (Bytef *) dst;
+
+    strm.zalloc = Z_NULL;
+    strm.zfree  = Z_NULL;
+    strm.opaque = Z_NULL;
+
+    int err = -1;
+    int ret = -1;
+
+    err = inflateInit2(&strm, (15 + 32)); //15 window bits, and the +32 tells zlib to to detect if using gzip or zlib
+    if (err == Z_OK) {
+        err = inflate(&strm, Z_FINISH);
+        if (err == Z_STREAM_END) {
+            ret = strm.total_out;
+        }
+        else {
+             inflateEnd(&strm);
+             return err;
+        }
+    }
+    else {
+        inflateEnd(&strm);
+        return err;
+    }
+
+    inflateEnd(&strm);
+    return ret;
 }
