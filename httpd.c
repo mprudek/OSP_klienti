@@ -27,8 +27,8 @@
 #include <zlib.h>
 #include "hashset.h"
 
-//#define TABLE 32768
-#define TABLE 7
+#define TABLE 32768
+//#define TABLE 7
 
 #define ISspace(x) isspace((int)(x))
 
@@ -71,7 +71,8 @@ void accept_request(int client){
 	struct stat st;
 	int length=0;	
 	char * data_buf;
-	int len;
+	int len,len2;
+	int comp_res;
 
  	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 	printf("head=%s\n",buf);
@@ -135,9 +136,25 @@ void accept_request(int client){
 		recv(client,data_buf,length,0);
 		len=*((int *)&(data_buf[length-4]));
 		printf("delka decompressed=%d\n",len);
-		if (len==0) len=100*length;
+		if (len==0) len=10*length;
 		decomp = calloc(len,sizeof(char));
-		length=inf(data_buf,length,decomp,len);
+		len2=len;
+		while(1){
+			comp_res=uncompress(decomp,&len2,data_buf,length);
+			if (comp_res==Z_OK) break;
+			if (comp_res==Z_MEM_ERROR){
+				free(decomp);
+				len=2*len;
+				len2=len;
+				decomp = calloc(len,sizeof(char));
+				printf("malo pameti, zvetsuji buffer\n");
+				continue;
+			}
+			if (comp_res==Z_MEM_ERROR){
+				printf("corrupted data\n");
+				exit(1);
+			}
+		}
 		printf("skuecna delka decompressed=%d\n",length);
 		decomp[length-1]='\0'; /*na konci dat je newline */
 		//printf("decomp=%s\n",decomp);
