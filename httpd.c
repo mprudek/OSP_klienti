@@ -140,7 +140,7 @@ void accept_request(int client){
 		decomp = calloc(len,sizeof(char));
 		len2=len;
 		while(1){
-			comp_res=inf(data_buf, length, decomp, len2);
+			comp_res=inf(data_buf, length, decomp, len);
 			if (comp_res>0){
 				len2=comp_res;
 				break;
@@ -148,7 +148,6 @@ void accept_request(int client){
 			if (comp_res==Z_MEM_ERROR){
 				free(decomp);
 				len=2*len;
-				len2=len;
 				decomp = calloc(len,sizeof(char));
 				printf("malo pameti, zvetsuji buffer\n");
 				continue;
@@ -158,8 +157,11 @@ void accept_request(int client){
 				break;
 			}
 			if (comp_res==Z_BUF_ERROR){
-				printf("buffer error\n");
-				exit(1);
+				free(decomp);
+				len=2*len;
+				decomp = calloc(len,sizeof(char));
+				printf("buf err malo pameti, zvetsuji buffer\n");
+				continue;
 			}
 			printf("neco jineho\n");
 			break;
