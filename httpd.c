@@ -57,7 +57,7 @@ hashset_t set;
  * return.  Process the request appropriately.
  * Parameters: the socket connected to the client */
 /**********************************************************************/
-#define PACKET 256		
+#define PACKET 256
 #define DECOMP_BUF_SIZE 1024
 void accept_request(int client){
  	char buf[1024];
@@ -137,7 +137,6 @@ void accept_request(int client){
 			}
 			k++;
 		}
-		printf("delka compressed=%d\n",length);
 		
 		//inicializace streamu
 
@@ -147,12 +146,13 @@ void accept_request(int client){
 
 
 		strm.next_in = (unsigned char*)data_buf;
-		strm.avail_out = avail; //volne misto ve vystupnim bufferu
-		strm.next_out = decomp_first; //adresa prvnoho byte pro dekomp data
+		strm.avail_out = DECOMP_BUF_SIZE;
+		strm.next_out = decomp; //adresa prvnoho byte pro dekomp data
 
 		next_word = 0;
 
 		while (length){
+			printf("delka compressed=%d\n",length);
 			//bajty, ktere chci precist
 			len = PACKET < length ? PACKET : length; 
 			length-=len; //odectu je od zbytku
@@ -160,15 +160,12 @@ void accept_request(int client){
 
 			strm.avail_in = len; //pocet bajtu k dekompresi
 	
-			
-
-			avail =  strm.avail_out;
 			/* updates next_in, avail_in, next_out, avail_out */			
 			ret = inflate(&strm, Z_SYNC_FLUSH);
 
-
-			size_decomp = avail - strm.avail_out;
-			if (ret == Z_STREAM_END){
+			if (ret == Z_OK){
+				printf("ok\n");
+			}else if (ret == Z_STREAM_END){
 				if (length){
 					printf("konec streamu pred koncem dat\n");
 				}else{
@@ -179,13 +176,9 @@ void accept_request(int client){
 				printf("buff error\n");
 				strm.next_out=strm.next_in = (unsigned char*)data_buf;
 				strm.avail_out = DECOMP_BUF_SIZE;
-			}else if (ret == Z_OK){
-				printf("ok\n");
-			}	
+			} 	
 			parse_words(decomp,&next_word,DECOMP_BUF_SIZE);
-			printf("delka decompressed=%d\n",size_decomp);
-			//printf("decomp=%s\n",decomp);
-			
+			printf("next_word=%d",next_word);	
 		}
 		inflateEnd(&strm);
 
@@ -472,6 +465,7 @@ void parse_words(char * buf, int* first, int buf_size){
 	char word[126];
 
 	while(buf[main_index]!='\0'){
+		printf("znak=%c\n",buf[main_index]);
 		if (isspace(buf[main_index])){
 			if (word_index){ /*delka slova neni nula*/
 				word[word_index]='\0'; /*ukoncim slovo*/
