@@ -61,7 +61,7 @@ hashset_t set;
 void accept_request(int client){
  	char buf[1024];
 	char buf2[1024];
-	char  * decomp;
+	char  * decomp, *decomp_first;
  	char method[255];
  	char url[255];
 	char path[512];
@@ -73,6 +73,10 @@ void accept_request(int client){
 	char * data_buf;
 	int len,len2;
 	int comp_res;
+	z_stream strm  = {0};
+	int ret;
+	int size_decomp;
+	int avail;
 
  	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 	printf("head=%s\n",buf);
@@ -132,48 +136,54 @@ void accept_request(int client){
 			k++;
 		}
 		printf("delka compressed=%d\n",length);
-		data_buf = calloc(length,sizeof(char));
-		recv(client,data_buf,length,0);
-		//len=*((int *)&(data_buf[length-4]));
-		len=0;
-		printf("delka decompressed=%d\n",len);
-		if (len==0) len=2*length;
-		decomp = calloc(len,sizeof(char));
-		len2=len;
-		while(1){
-			comp_res=inf(data_buf, length, decomp, len);
-			if (comp_res>0){
-				len2=comp_res;
-				break;
-			}
-			if (comp_res==Z_MEM_ERROR){
-				free(decomp);
-				len=2*len;
-				decomp = calloc(len,sizeof(char));
-				printf("malo pameti, zvetsuji buffer\n");
-				continue;
-			}
-			if (comp_res==Z_DATA_ERROR){
-				printf("corrupted data\n");
-				break;
-			}
-			if (comp_res==Z_BUF_ERROR){
-				free(decomp);
-				len=2*len;
-				decomp = calloc(len,sizeof(char));
-				printf("buf err malo pameti, zvetsuji buffer\n");
-				continue;
-			}
-			printf("neco jineho\n");
-			break;
+		
+		//inicializace streamu
+		#define PACKET 256		
+		#define DECOMP_BUF_SIZE 1024
+		inflateInit2(&strm,15 | 32);
+		data_buf = calloc(PACKET,sizeof(char));
+		decomp = calloc(DECOMP_BUF_SIZE,sizeof(char));
+		avail = DECOMP_BUF_SIZE;
+		decomp_first = decomp;
+
+
+		strm.next_in = (unsigned char*)data_buf;
+		strm.avail_out = avail; //volne misto ve vystupnim bufferu
+		strm.next_out = decomp_first; //adresa prvnoho byte pro dekomp data
+		while (length){
+			//bajty, ktere chci precist
+			len = PACKET < length ? PACKET : length; 
+			length-=len; //odectu je od zbytku
+			recv(client,data_buf,len,0);
+
+			strm.avail_in = len; //pocet bajtu k dekompresi
+	
+			
+
+			avail =  strm.avail_out;
+			/* updates next_in, avail_in, next_out, avail_out */			
+			ret = inflate(&strm, Z_SYNC_FLUSH);
+
+
+			size_decomp = avail - strm.avail_out;
+			if (ret == Z_STREAM_END){
+				printf("konec streamu\n");
+			/* dosel vystupni buffer */
+			}else if (ret ==  Z_BUF_ERROR){
+				printf("buff error\n");
+				strm.next_out=strm.next_in = (unsigned char*)data_buf;
+				strm.avail_out = DECOMP_BUF_SIZE;
+			}else if (ret == Z_OK){
+				printf("ok\n");
+			}	
+			
 		}
+		inflateEnd(&strm);
+
+		printf("delka decompressed=%d\n",size_decomp);
 		
 		
-		
-		
-		
-		printf("skuecna delka decompressed=%d\n",len2);
-		decomp[len2-1]='\0'; /*na konci dat je newline */
+		decomp[len-1]='\0'; /*na konci dat je newline */
 		printf("decomp=%s\n",decomp);
 		parse_words(decomp);
 		free(data_buf);
