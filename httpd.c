@@ -57,7 +57,7 @@ hashset_t set;
  * return.  Process the request appropriately.
  * Parameters: the socket connected to the client */
 /**********************************************************************/
-#define PACKET 256
+#define PACKET 16
 #define DECOMP_BUF_SIZE 1024
 void accept_request(int client){
  	char buf[1024];
@@ -455,14 +455,32 @@ int inf(const void *src, int srcLen, void *dst, int dstLen) {
     inflateEnd(&strm);
     return ret;
 }
+void delete_word(char * buf, int first, int last, int buf_size){
+	int i;
+	if (first<last){
+		for (i=first;i<=last;i++){
+			buf[i]='\0';
+		}
+	}else{
+		for (i=first;i<buf_size;i++){
+			buf[i]='\0';
+		}
+		for (i=0;i<=last;i++){
+			buf[i]='\0';
+		}
+	}
+
+}
 /**********************************************************************/
-/* Dekomprimuje obsah bufferu a ulozi ho do dalsihoi bufferu*/
-/* Vraci pozici prvniho bajtu prvniho nedokonceneho slova */
+/* Dekomprimuje obsah bufferu a ulozi ho do dalsihoi bufferu          */
+/* Vraci pozici prvniho bajtu prvniho nedokonceneho slova             */
+/* Za kazdym slovem ocekavame space character -> isspace(char c)      */
 /**********************************************************************/
 void parse_words(char * buf, int* first, int buf_size){
 	int main_index=*first; /*iterace pres bajty v bufferu*/
 	int word_index=0; /* itrace pres bajty v aktualnim sloce */
 	char word[126];
+	printf("in parse\n");
 
 	while(buf[main_index]!='\0'){
 		printf("znak=%c\n",buf[main_index]);
@@ -470,24 +488,18 @@ void parse_words(char * buf, int* first, int buf_size){
 			if (word_index){ /*delka slova neni nula*/
 				word[word_index]='\0'; /*ukoncim slovo*/
 				hashset_add(set, (void *)word, word_index);
+				delete_word(buf, *first, main_index-1, buf_size);
 				printf("slovo=%s\n",word);
 				word_index=0;
 			}
+			buf[main_index]='\0';
 		}else{	
 			/*prvni pismeno noveho slova*/
 			if (!word_index) *first = main_index;
 			word[word_index]=buf[main_index];
 			word_index++;
 		}
-		buf[main_index]='\0'; /* co prectu, premazu*/
 		main_index++;
 		main_index%=buf_size;
-	}
-	/*buffer nepretekl && delka slova neni nula*/
-	if (word_index){ 
-		word[word_index]='\0'; /*ukoncim slovo*/
-		//TODO semafor 
-		hashset_add(set, (void *)word, word_index);
-		printf("slovo=%s\n",word);
 	}
 }
