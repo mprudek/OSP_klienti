@@ -49,8 +49,7 @@ void unimplemented(int);
 void sent_count(int client, int count);
 void sent_OK(int client);
 int inf(const void *src, int srcLen, void *dst, int dstLen) ;
-void parse_words(char * buf);
-
+void parse_words(char * buf, int* first, int buf_size);
 hashset_t set;
 
 /**********************************************************************/
@@ -58,10 +57,12 @@ hashset_t set;
  * return.  Process the request appropriately.
  * Parameters: the socket connected to the client */
 /**********************************************************************/
+#define PACKET 256		
+#define DECOMP_BUF_SIZE 1024
 void accept_request(int client){
  	char buf[1024];
 	char buf2[1024];
-	char  * decomp, *decomp_first;
+	char  * decomp[DECOMP_BUF_SIZE]={'\0'}, *decomp_first;
  	char method[255];
  	char url[255];
 	char path[512];
@@ -70,13 +71,14 @@ void accept_request(int client){
 	unsigned char k,l;
 	struct stat st;
 	int length=0;	
-	char * data_buf;
+	char data_buf[PACKET];
 	int len,len2;
 	int comp_res;
 	z_stream strm  = {0};
 	int ret;
 	int size_decomp;
 	int avail;
+	int next_word;
 
  	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 	printf("head=%s\n",buf);
@@ -138,11 +140,8 @@ void accept_request(int client){
 		printf("delka compressed=%d\n",length);
 		
 		//inicializace streamu
-		#define PACKET 256		
-		#define DECOMP_BUF_SIZE 1024
+
 		inflateInit2(&strm,15 | 32);
-		data_buf = calloc(PACKET,sizeof(char));
-		decomp = calloc(DECOMP_BUF_SIZE,sizeof(char));
 		avail = DECOMP_BUF_SIZE;
 		decomp_first = decomp;
 
@@ -150,6 +149,9 @@ void accept_request(int client){
 		strm.next_in = (unsigned char*)data_buf;
 		strm.avail_out = avail; //volne misto ve vystupnim bufferu
 		strm.next_out = decomp_first; //adresa prvnoho byte pro dekomp data
+
+		next_word = 0;
+
 		while (length){
 			//bajty, ktere chci precist
 			len = PACKET < length ? PACKET : length; 
@@ -167,7 +169,11 @@ void accept_request(int client){
 
 			size_decomp = avail - strm.avail_out;
 			if (ret == Z_STREAM_END){
-				printf("konec streamu\n");
+				if (length){
+					printf("konec streamu pred koncem dat\n");
+				}else{
+					printf("konec streamu s koncem dat\n");
+				}
 			/* dosel vystupni buffer */
 			}else if (ret ==  Z_BUF_ERROR){
 				printf("buff error\n");
@@ -176,18 +182,14 @@ void accept_request(int client){
 			}else if (ret == Z_OK){
 				printf("ok\n");
 			}	
+			parse_words(decomp,&next_word,DECOMP_BUF_SIZE);
+			printf("delka decompressed=%d\n",size_decomp);
+			//printf("decomp=%s\n",decomp);
 			
 		}
 		inflateEnd(&strm);
 
-		printf("delka decompressed=%d\n",size_decomp);
 		
-		
-		decomp[len-1]='\0'; /*na konci dat je newline */
-		printf("decomp=%s\n",decomp);
-		parse_words(decomp);
-		free(data_buf);
-		free(decomp);
 		sent_OK(client); /*pokud tohle neodeslu pred zavrenim, klient
 				si zahlasi :empty response: */
 		close(client);
@@ -462,27 +464,36 @@ int inf(const void *src, int srcLen, void *dst, int dstLen) {
 }
 /**********************************************************************/
 /* Dekomprimuje obsah bufferu a ulozi ho do dalsihoi bufferu*/
+/* Vraci pozici prvniho bajtu prvniho nedokonceneho slova */
 /**********************************************************************/
-void parse_words(char * buf){
-	int main_index=0; /*iterace pres bajty v bufferu*/
+void parse_words(char * buf, int* first, int buf_size){
+	int main_index=*first; /*iterace pres bajty v bufferu*/
 	int word_index=0; /* itrace pres bajty v aktualnim sloce */
 	char word[126];
 
 	while(buf[main_index]!='\0'){
-		if (buf[main_index]==' '){
+		if (isspace(buf[main_index])){
 			if (word_index){ /*delka slova neni nula*/
-				word[word_index]='\0';
+				word[word_index]='\0'; /*ukoncim slovo*/
 				hashset_add(set, (void *)word, word_index);
+				printf("slovo=%s\n",word);
 				word_index=0;
 			}
-		}else{
+		}else{	
+			/*prvni pismeno noveho slova*/
+			if (!word_index) *first = main_index;
 			word[word_index]=buf[main_index];
 			word_index++;
 		}
+		buf[main_index]='\0'; /* co prectu, premazu*/
 		main_index++;
+		main_index%=buf_size;
 	}
-	if (word_index){ /*delka slova neni nula*/
-		word[word_index]='\0';
+	/*buffer nepretekl && delka slova neni nula*/
+	if (word_index){ 
+		word[word_index]='\0'; /*ukoncim slovo*/
+		//TODO semafor 
 		hashset_add(set, (void *)word, word_index);
+		printf("slovo=%s\n",word);
 	}
 }
