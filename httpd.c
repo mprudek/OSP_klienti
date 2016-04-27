@@ -25,6 +25,7 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <zlib.h>
+#include <pthread.h>
 #include "hashset.h"
 
 #define TABLE 32768
@@ -34,7 +35,12 @@
 
 #define SERVER_STRING "Server: jdbhttpd/0.1.0\r\n"
 
-void accept_request(int);
+struct parametry{
+        int client;
+	hashset_t set;
+};
+
+void * accept_request(void*);
 void bad_request(int);
 void cat(int, FILE *);
 void cannot_execute(int);
@@ -75,7 +81,7 @@ void print_decomp(char * buf, int first, int decomprimed, int buf_size){
 /**********************************************************************/
 #define PACKET 1500
 #define DECOMP_BUF_SIZE 50000
-void accept_request(int client){
+void * accept_request(void *  param){
  	char buf[1024];
 	char buf2[1024];
 	char decomp[DECOMP_BUF_SIZE]={'k'};
@@ -99,8 +105,9 @@ void accept_request(int client){
 	int prijato;
 	char zlib_out[DECOMP_BUF_SIZE];
 	int celkem=0;
+	struct parametry * par = (struct parametry *)param;
 
- 	numchars=get_line(client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
+ 	numchars=get_line(par->client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 	printf("head=%s\n",buf);
 
 	i=0;	
@@ -114,8 +121,10 @@ void accept_request(int client){
  	method[i] = '\0';
 
  	if (strcasecmp(method, "GET") && strcasecmp(method, "POST")){
-  		unimplemented(client);
-  		return;
+  		unimplemented(par->client);
+  		close(par->client);
+		free(par);
+		pthread_exit(0);
  	}
  	
 	/* preskocime mezery */
@@ -135,12 +144,13 @@ void accept_request(int client){
 	if (strcasecmp(method, "POST") == 0){
 		/* chybny resource*/
 		if (strcmp(url,"/osp/myserver/data")){
-			close(client);
-			return;
+ 			close(par->client);
+			free(par);
+			pthread_exit(0);
 		}
 		k=0;
 		while(1){
-			get_line(client, buf2, sizeof(buf2));
+			get_line(par->client, buf2, sizeof(buf2));
 			/*newlajna pred prilohou*/
 			if (buf2[0]=='\n'){
 				break;
@@ -175,7 +185,7 @@ void accept_request(int client){
 		while (length){
 			//bajty, ktere chci precist
 			len = PACKET < length ? PACKET : length; 
-			prijato=recv(client,data_buf,len,0);
+			prijato=recv(par->client,data_buf,len,0);
 			length-=prijato;
 			//printf("prijato=%d, pozadovano=%d\n",prijato, len);
 
@@ -227,17 +237,17 @@ void accept_request(int client){
 		}
 		inflateEnd(&strm);
 
-		sent_OK(client); /*pokud tohle neodeslu pred zavrenim, klient
+		sent_OK(par->client); /*pokud tohle neodeslu pred zavrenim, klient
 				si zahlasi :empty response: */
-		close(client);
-		return;
-
+ 		close(par->client);
+		free(par);
+		pthread_exit(0);
 	}
 
 	if (strcasecmp(method, "GET") == 0){
 		if (!strcmp(url,"/osp/myserver/count")){
 			printf("slova=%d\n",hashset_num_items(set));
-			sent_count(client,hashset_num_items(set));
+			sent_count(par->client,hashset_num_items(set));
 			hashset_destroy(set);
 			set = hashset_create(TABLE);
 			if (set == NULL) {
@@ -248,12 +258,14 @@ void accept_request(int client){
 
 	        if (stat(path, &st) == -1) {
                 while ((numchars > 0) && strcmp("\n", buf)) { /* read & discard headers */
-                        numchars = get_line(client, buf, sizeof(buf));
+                        numchars = get_line(par->client, buf, sizeof(buf));
                 }
                 //not_found(client);
         }
-
- 	close(client);
+	
+ 	close(par->client);
+	free(par);
+	pthread_exit(0);
 }
 
 
@@ -441,6 +453,12 @@ int main(void){
  	struct sockaddr_in client_name;
  	int client_name_len = sizeof(client_name);
 
+	pthread_t tid;          //identifikator vlakna
+        pthread_attr_t attr;    //atributy vlakna
+	struct parametry *p1;
+
+        pthread_attr_init(&attr);       //inicializuj implicitni atributy
+
  	server_sock = startup(&port);
  	printf("httpd running on port %d\n", port);
 
@@ -458,7 +476,10 @@ int main(void){
   		if (client_sock == -1){
    			error_die("accept");
 		}
-  		accept_request(client_sock); 
+		p1 = malloc(sizeof(struct parametry));
+		p1->client = client_sock;
+		p1->set = set;
+		pthread_create(&tid, &attr, accept_request, (void*)p1);        //vytvor vlakno 
  	}
  	close(server_sock);
 	return(0);
