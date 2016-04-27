@@ -369,7 +369,7 @@ void sent_count(int client, int count){
  	sprintf(buf, "\r\n");
  	send(client, buf, strlen(buf), 0);
 
- 	sprintf(buf, "%d\r\n",count);
+ 	sprintf(buf, "%d",count);
 	send(client, buf, strlen(buf), 0);
 }
 
