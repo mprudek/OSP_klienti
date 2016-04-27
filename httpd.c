@@ -29,7 +29,7 @@
 #include <semaphore.h>
 #include "hashset.h"
 
-#define TABLE 16777216
+#define TABLE (16777216*2)
 //#define TABLE 7
 
 #define ISspace(x) isspace((int)(x))
