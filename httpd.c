@@ -100,7 +100,6 @@ void * accept_request(void *  param){
 	char data_buf[PACKET];
 	int len;
 	z_stream strm  = {0};
-	int ret;
 	int next_word;
 	int out_space; 
 	int pred_infl;
@@ -108,8 +107,10 @@ void * accept_request(void *  param){
 	int index_decomp;
 	int prijato;
 	char zlib_out[DECOMP_BUF_SIZE];
-	int celkem=0;
 	struct parametry * par = (struct parametry *)param;
+	#ifdef DEBUG
+	int ret;
+	#endif
 
  	numchars=get_line(par->client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
 //	printf("head=%s\n",buf);
@@ -161,7 +162,7 @@ void * accept_request(void *  param){
 				break;
 			}
 			/* delka prilohy je ve 4. lajne hlavicky*/
-			if (buf2[7]=='-' && buf2[8]=='L'){
+			if (buf2[8]=='L'){
 				l=16; /*delka prilohy je na 16 pozici*/
 				while (buf2[l]!='\n' && buf2[l]!='\r' 
 						&& buf2[l]!='\0' ){
@@ -181,7 +182,6 @@ void * accept_request(void *  param){
 		strm.next_out = (unsigned char*)zlib_out; //adresa prvnoho byte pro dekomp data
 
 		next_word = 0;
-		out_space = DECOMP_BUF_SIZE;
 		index_decomp = 0;
 
 		/* DEKOMPRESE - TODO kontrolovat, zda si neprepisuju stara data  */
@@ -200,8 +200,12 @@ void * accept_request(void *  param){
 			strm.next_in = (unsigned char*)data_buf;	
 
 			/* updates next_in, avail_in, next_out, avail_out */	
-			pred_infl = strm.avail_out;		
+			pred_infl = strm.avail_out;
+			#ifdef DEBUG		
 			ret = inflate(&strm, Z_SYNC_FLUSH);
+			#else 
+			inflate(&strm, Z_SYNC_FLUSH);
+			#endif  
 			dekomprimovano = pred_infl-strm.avail_out;
 			
 			for (i=0;i<dekomprimovano;i++){
@@ -212,8 +216,6 @@ void * accept_request(void *  param){
 
 			
 			//print_decomp(decomp, index_decomp, dekomprimovano,DECOMP_BUF_SIZE );
-			out_space-=dekomprimovano;
-			celkem+=dekomprimovano;
 			//printf("dekopmrimovano=%d celkem=%d\n",dekomprimovano,celkem);
 
 			/* dosel vstupni buffer */
@@ -247,7 +249,7 @@ void * accept_request(void *  param){
 				printf("\nstream error\n");
 			}
 			#endif
-			out_space+=parse_words(decomp,&next_word,DECOMP_BUF_SIZE);
+			parse_words(decomp,&next_word,DECOMP_BUF_SIZE);
 			//printf("outer space po parse=%d\n",out_space);	
 		}
 	//	printf("koncim vlakno\n");
@@ -578,9 +580,9 @@ int parse_words(char * buf, int* first, int buf_size){
 			//printf("pw mezera\n");
 			if (word_index){ /*delka slova neni nula*/
 				word[word_index]='\0'; /*ukoncim slovo*/
-				sem_wait(&sem);
-				hashset_add(set, (void *)word, word_index);
-				sem_post(&sem);
+				//sem_wait(&sem);
+				hashset_add(set, (void *)word, word_index,&sem);
+				//sem_post(&sem);				
 				chars+=delete_word(buf, *first, main_index-1, buf_size);
 				//printf("pw slovo= %s\n",word);
 				word_index=0;

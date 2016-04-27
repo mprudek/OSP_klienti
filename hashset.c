@@ -36,7 +36,7 @@ int hashset_num_items(hashset_t set)
     return set->items_count;
 }
 
-static void free_member(struct member * mem){
+inline static void free_member(struct member * mem){
 	if (mem->next){
 		free_member(mem->next);
 	}
@@ -56,7 +56,7 @@ void hashset_destroy(hashset_t set){
 }
 
 
-static int compare(char * one, char * two, int size){
+inline static int compare(char * one, char * two, int size){
 	int i;
 	for (i=0;i<size;i++){
 		if (one[i]!=two[i]){
@@ -66,25 +66,27 @@ static int compare(char * one, char * two, int size){
 	return 1;
 }
 
-static void copy_item(char * from, char * to, int size){
+inline static void copy_item(char * from, char * to, int size){
 	int i;
 	for (i=0;i<size;i++){
 		to[i]=from[i];
 	}
 }
 
-static int hashset_add_member(hashset_t set, void *itemx, int size){	
+void hashset_add(hashset_t set, void *itemx, int size, sem_t * sem){	
 	void * item;
 	struct member *mem;
 	unsigned int h;
 	item = calloc(size, sizeof(char));
 	copy_item(itemx,item,size);
 	h = hash(item, set->table_size,size);
+	sem_wait(sem);
 	if (set->table[h]){ /*zaznam uz existuje*/
 		mem = set->table[h];
 		do{
-			if (mem->length==size && compare(mem->data,item,size)){
-				return 0;	
+			if (mem->length==size && compare(mem->data,item,size)){	
+				sem_post(sem);				
+				return;
 			}
 		}while(mem->next && (mem=mem->next) );
 		mem->next = malloc(sizeof(struct member));
@@ -92,23 +94,17 @@ static int hashset_add_member(hashset_t set, void *itemx, int size){
 		mem->next=0;
 		mem->data=item;
 		mem->length=size;
-		return 1;
-		
-		
+		set->items_count++;		
 	}else{ /* zaznam neexistuje */
 		set->table[h] = malloc(sizeof(struct member));
 		set->table[h]->next=0;
 		set->table[h]->data=item;
 		set->table[h]->length=size;
-		return 1;
+		set->items_count++;
+
 	}
-	return 0;
-}
-int hashset_add(hashset_t set, void *item, int size){	
-	int i;
-	i = hashset_add_member(set,item,size);
-	set->items_count+=i;
-	return i;
+	sem_post(sem);
+	return;
 }
 
 

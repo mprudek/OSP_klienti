@@ -1,3 +1,4 @@
+#include <semaphore.h>
 	struct member {
 		struct member * next;
 		char * data;
@@ -29,7 +30,7 @@
      *
      * returns zero if the item already in the set and non-zero otherwise
      */
-    int hashset_add(hashset_t set, void *item,int size);
+    void hashset_add(hashset_t set, void *item,int size, sem_t *sem);
 
  
 
