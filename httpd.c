@@ -36,6 +36,8 @@
 
 #define SERVER_STRING "Server: jdbhttpd/0.1.0\r\n"
 
+//#define DEBUG
+
 struct parametry{
         int client;
 	hashset_t set;
@@ -110,7 +112,7 @@ void * accept_request(void *  param){
 	struct parametry * par = (struct parametry *)param;
 
  	numchars=get_line(par->client, buf, sizeof(buf)); /* POST /osp/myserver/data HTTP/1.1 */
-	printf("head=%s\n",buf);
+//	printf("head=%s\n",buf);
 
 	i=0;	
 	j=0;
@@ -153,12 +155,13 @@ void * accept_request(void *  param){
 		k=0;
 		while(1){
 			get_line(par->client, buf2, sizeof(buf2));
+		//	printf("%d. lajna hlavicky = %s",k,buf2);
 			/*newlajna pred prilohou*/
 			if (buf2[0]=='\n'){
 				break;
 			}
 			/* delka prilohy je ve 4. lajne hlavicky*/
-			if (k==3){
+			if (buf2[7]=='-' && buf2[8]=='L'){
 				l=16; /*delka prilohy je na 16 pozici*/
 				while (buf2[l]!='\n' && buf2[l]!='\r' 
 						&& buf2[l]!='\0' ){
@@ -169,7 +172,7 @@ void * accept_request(void *  param){
 			}
 			k++;
 		}
-		printf("komprimovano=%d\n",length);
+	//	printf("komprimovano=%d\n",length);
 
 		inflateInit2(&strm,15 | 32);
 
@@ -214,18 +217,21 @@ void * accept_request(void *  param){
 			//printf("dekopmrimovano=%d celkem=%d\n",dekomprimovano,celkem);
 
 			/* dosel vstupni buffer */
+			#ifdef DEBUG
 			if (ret == Z_OK){
 				/* vse uspesne precteno, nastavim input na zacatek*/
 				//printf("\nok, out_space=%d\n",out_space);
 			}else if (ret == Z_STREAM_END){
 				if (length){
-					printf("\nkonec streamu pred koncem dat\n");
 					while (length){
+						printf("delka=%d\n",length);
 						//bajty, ktere chci precist
 						len = PACKET < length ? PACKET : length; 
 						prijato=recv(par->client,data_buf,len,0);
 						length-=prijato;
+						if (prijato==0) break;
 					}
+					printf("\nkonec streamu pred koncem dat\n");
 				}else{
 					printf("\nkonec streamu s koncem dat\n");
 				}
@@ -240,9 +246,11 @@ void * accept_request(void *  param){
 			}else if (ret == Z_STREAM_ERROR){
 				printf("\nstream error\n");
 			}
+			#endif
 			out_space+=parse_words(decomp,&next_word,DECOMP_BUF_SIZE);
 			//printf("outer space po parse=%d\n",out_space);	
 		}
+	//	printf("koncim vlakno\n");
 		inflateEnd(&strm);
 
 		sent_OK(par->client); /*pokud tohle neodeslu pred zavrenim, klient
