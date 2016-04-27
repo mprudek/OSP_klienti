@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <zlib.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include "hashset.h"
 
 #define TABLE 32768
@@ -57,6 +58,7 @@ void sent_OK(int client);
 int inf(const void *src, int srcLen, void *dst, int dstLen) ;
 int parse_words(char * buf, int* first, int buf_size);
 hashset_t set;
+sem_t sem;
 
 void print_decomp(char * buf, int first, int decomprimed, int buf_size){
 	int i;
@@ -458,6 +460,8 @@ int main(void){
 	struct parametry *p1;
 
         pthread_attr_init(&attr);       //inicializuj implicitni atributy
+	sem_init(&sem, 0, 1); //thread-shared, init-value 1
+
 
  	server_sock = startup(&port);
  	printf("httpd running on port %d\n", port);
@@ -481,6 +485,7 @@ int main(void){
 		p1->set = set;
 		pthread_create(&tid, &attr, accept_request, (void*)p1);        //vytvor vlakno 
  	}
+	sem_destroy(&sem);
  	close(server_sock);
 	return(0);
 }
@@ -559,7 +564,9 @@ int parse_words(char * buf, int* first, int buf_size){
 			//printf("pw mezera\n");
 			if (word_index){ /*delka slova neni nula*/
 				word[word_index]='\0'; /*ukoncim slovo*/
+				sem_wait(&sem);
 				hashset_add(set, (void *)word, word_index);
+				sem_post(&sem);
 				chars+=delete_word(buf, *first, main_index-1, buf_size);
 				//printf("pw slovo= %s\n",word);
 				word_index=0;
