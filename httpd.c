@@ -220,6 +220,12 @@ void * accept_request(void *  param){
 			}else if (ret == Z_STREAM_END){
 				if (length){
 					printf("\nkonec streamu pred koncem dat\n");
+					while (length){
+						//bajty, ktere chci precist
+						len = PACKET < length ? PACKET : length; 
+						prijato=recv(par->client,data_buf,len,0);
+						length-=prijato;
+					}
 				}else{
 					printf("\nkonec streamu s koncem dat\n");
 				}
